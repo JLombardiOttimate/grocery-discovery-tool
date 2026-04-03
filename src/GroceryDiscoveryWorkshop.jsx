@@ -34,14 +34,15 @@ const FRAMING = {
   techSkills: "The system is browser-based and designed to be straightforward, but onboarding involves connecting accounts, uploading vendor data, and troubleshooting the occasional exception. Having someone on your team who's comfortable with basic software administration makes the first 30 days significantly smoother.",
   implOwner: "Every grocery operator where we deliver value quickly has one thing in common: a named person who owns the implementation and can dedicate real time to it. They don't need to be technical — they need to be available and empowered to make decisions about vendor setup, GL coding, and approval workflows.",
   timeline: "The honest truth: your team's capacity determines the timeline more than our technology does. If you're in the middle of a seasonal rush, a system migration, or a staffing transition, building that into the plan upfront prevents the perception that the system is slow when the reality is competing priorities.",
-  successMetrics: "The operators who get the most value from automation are the ones who define 'success' in specific, measurable terms before they start. Not 'make it easier' but 'reduce processing time by 50%' or 'catch pricing discrepancies automatically.' If we can agree on the target now, we'll both know when the system is delivering."
+  successMetrics: "The operators who get the most value from automation are the ones who define 'success' in specific, measurable terms before they start. Not 'make it easier' but 'reduce processing time by 50%' or 'catch pricing discrepancies automatically.' If we can agree on the target now, we'll both know when the system is delivering.",
+  deptHeads: "This is one that surprises a lot of operators. Your meat manager, produce manager, deli lead — they're often spending hours every week checking vendor invoices against what was actually delivered and what the price should have been. On top of that, they're organizing paperwork, matching credits, and sometimes reconciling statements for their department. Finance may not see this labor because it happens at the store level, but it's real time from your highest-paid floor staff."
 };
 
 // ═══ Impact tooltip definitions ═══
 const IMPACT_TOOLTIPS = {
   'Pricing Variance Recovery': "Vendors overcharge more than you'd expect — industry data across 481M invoices (Xelix 2026) puts the benchmark at 1.2% of vendor spend. We apply a 75% capture rate and adjust for your invoice mix. This is the value of pricing errors caught before payment rather than chased down after.",
   'Invoice Processing Labor': "Your current cost per invoice (minutes × hourly rate) minus the automated cost (roughly 2 min for exceptions only) minus the labor for handling the exceptions that automation flags. Year 1 includes a one-time investment to map your SKU base to GL codes.",
-  'Store Operations Recovery': "The hours your GMs and receivers spend physically handling paper invoices, organizing delivery slips, and reconciling receipts — multiplied across every location, every week. This time goes away when invoices are captured digitally at delivery.",
+  'Store Operations Recovery': "The hours your GMs, receivers, and department heads spend physically handling paper invoices, verifying costs, organizing delivery slips, and reconciling receipts — multiplied across every location, every week. Department heads like your meat, produce, and deli managers often spend significant time checking that what was invoiced matches what was delivered and priced correctly. This time goes away when invoices are captured and validated digitally.",
   'Vendor Credit Recovery': "Credits, debit memos, and short-pays that go untracked because AP doesn't have time to follow up systematically. With automated tracking, these get surfaced and claimed. Estimate: 0.7% of vendor spend at a 50% recovery rate.",
   'Month-End Close Efficiency': "The overtime and reconciliation hours that pile up every close cycle because AP is catching up rather than staying current. Automation keeps the books cleaner in real time, so close is a verification step instead of a catch-up sprint. Estimated at 70% reduction in overtime hours and 65% reduction in reconciliation time.",
   'Growth Scalability': "Adding a store without AP automation usually means adding AP headcount. With a mature system, your team absorbs new volume with minimal incremental labor. This estimates 25% of a $52K fully-loaded AP position in cost avoidance per new store planned."
@@ -147,9 +148,20 @@ function SelectField({ label, value, onChange, options, note='' }) {
 
 // ═══ Main Component ═══
 export default function GroceryDiscoveryWorkshop() {
+  // ─── Mode: 'customer' (default), 'sdr', or 'internal' (full AE view) ───
+  const [mode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('mode') || 'customer';
+  });
+  const isInternal = mode === 'internal';
+  const isSDR = mode === 'sdr';
+  const activePhases = isSDR
+    ? PHASES.filter(p => ['welcome', 'operation', 'impact'].includes(p.id))
+    : PHASES;
+
   const [phase, setPhase] = useState(0);
   const [showImpact, setShowImpact] = useState(false);
-  const [showSignals, setShowSignals] = useState(false);
+  const [showSignals, setShowSignals] = useState(false); // only toggleable in internal mode
   const [showSummary, setShowSummary] = useState(false);
   const [expandedCalcs, setExpandedCalcs] = useState({});
   const [prospectName, setProspectName] = useState('');
@@ -176,18 +188,22 @@ export default function GroceryDiscoveryWorkshop() {
   const [scanning, setScanning] = useState('');
   const [techSkills, setTechSkills] = useState('');
 
-  // ─── Phase 4: Team ───
+  // ─── Phase 4: Team (demographics / headcounts) ───
+  const [apHeadcount, setApHeadcount] = useState('');
+  const [deptHeadCount, setDeptHeadCount] = useState('');
   const [implOwner, setImplOwner] = useState('');
   const [timeline, setTimeline] = useState('');
   const [successMetrics, setSuccessMetrics] = useState('');
 
-  // ─── Phase 5: Costs (ROI inputs) ───
-  const [apHeadcount, setApHeadcount] = useState('');
+  // ─── Phase 5: Costs (rates, hours, ROI inputs) ───
   const [apRate, setApRate] = useState('');
   const [manualMin, setManualMin] = useState('');
   const [codingPractice, setCodingPractice] = useState('summary');
   const [storeOpsHrs, setStoreOpsHrs] = useState('');
   const [gmRate, setGmRate] = useState('');
+  const [deptHeadCostHrs, setDeptHeadCostHrs] = useState('');
+  const [deptHeadAdminHrs, setDeptHeadAdminHrs] = useState('');
+  const [deptHeadRate, setDeptHeadRate] = useState('');
   const [closeOT, setCloseOT] = useState('');
   const [reconHrs, setReconHrs] = useState('');
   const [growthStores, setGrowthStores] = useState('');
@@ -195,6 +211,15 @@ export default function GroceryDiscoveryWorkshop() {
   const [dsdSpend, setDsdSpend] = useState(1000000);
   const [netMargin, setNetMargin] = useState(0.02);
   const [ottimateAnnual, setOttimateAnnual] = useState('');
+
+  // ═══ SDR defaults — when SDR mode skips the Costs phase, use industry averages ═══
+  const effApRate = isSDR && !apRate ? 25 : n(apRate);
+  const effManualMin = isSDR && !manualMin ? 12 : n(manualMin);
+  const effGmRate = isSDR && !gmRate ? 30 : n(gmRate);
+  const effStoreOpsHrs = isSDR && !storeOpsHrs ? 3 : n(storeOpsHrs);
+  const effDeptHeadRate = isSDR && !deptHeadRate ? 28 : n(deptHeadRate);
+  const effCloseOT = isSDR && !closeOT ? 8 : n(closeOT);
+  const effReconHrs = isSDR && !reconHrs ? 12 : n(reconHrs);
 
   // ═══ Qualification Score ═══
   const qualScore = useMemo(() => {
@@ -205,7 +230,7 @@ export default function GroceryDiscoveryWorkshop() {
     if (vendorCount) { const v = n(vendorCount); score += v < 50 ? 2 : v < 100 ? 1 : v < 150 ? 0 : -2; }
     if (vendorClean === 'clean') score += 3; else if (vendorClean === 'some') score += 1; else if (vendorClean === 'messy') score -= 2;
     if (itemCatalog === 'clean') score += 3; else if (itemCatalog === 'partial') score += 1; else if (itemCatalog === 'messy') score -= 3;
-    if (erp === 'qbo') score += 3; else if (erp === 'qbd' || erp === 'sage') score += 1; else if (erp === 'complex') score -= 3;
+    if (erp === 'qbo') score += 3; else if (erp === 'qbd' || erp === 'sage' || erp === 'fms') score += 1; else if (erp === 'complex') score -= 3;
     if (techSkills === 'strong') score += 2; else if (techSkills === 'willing') score += 1; else if (techSkills === 'limited') score -= 2;
     if (implOwner === 'named') score += 3; else if (implOwner === 'busy') score += 1; else if (implOwner === 'none') score -= 3;
     return score;
@@ -235,24 +260,27 @@ export default function GroceryDiscoveryWorkshop() {
   const f1 = autoPath >= 2 ? (autoPath === 4 ? f1DSD + f1IVAdj : autoPath === 3 ? f1DSD : f1IV) : 0;
 
   const autoRate = 0.85;
-  const curCost       = actualAnnualVol * n(manualMin) * (n(apRate) / 60);
-  const autoCost      = actualAnnualVol * autoRate * 2 * (n(apRate) / 60);
-  const excCost       = actualAnnualVol * (1 - autoRate) * 8 * (n(apRate) / 60);
-  const transitionY1  = codingPractice !== 'line-item' && autoPath >= 2 ? (40 * n(apRate)) + (1.5 * n(apRate) * 52) : 0;
-  const transitionY2  = codingPractice !== 'line-item' && autoPath >= 2 ? (1.5 * n(apRate) * 52) : 0;
+  const curCost       = actualAnnualVol * effManualMin * (effApRate / 60);
+  const autoCost      = actualAnnualVol * autoRate * 2 * (effApRate / 60);
+  const excCost       = actualAnnualVol * (1 - autoRate) * 8 * (effApRate / 60);
+  const transitionY1  = codingPractice !== 'line-item' && autoPath >= 2 ? (40 * effApRate) + (1.5 * effApRate * 52) : 0;
+  const transitionY2  = codingPractice !== 'line-item' && autoPath >= 2 ? (1.5 * effApRate * 52) : 0;
   const f2y1 = (curCost - autoCost) - excCost - transitionY1;
   const f2y2 = (curCost - autoCost) - excCost - transitionY2;
   const f2 = f2y1;
 
-  const f3 = n(storeCount) * n(storeOpsHrs) * 52 * n(gmRate);
+  const f3gmReceiver = n(storeCount) * effStoreOpsHrs * 52 * effGmRate;
+  const f3deptHead = n(deptHeadCount) * (n(deptHeadCostHrs) + n(deptHeadAdminHrs)) * 52 * effDeptHeadRate;
+  const f3 = f3gmReceiver + f3deptHead;
   const f4 = (autoPath === 2 || autoPath === 4) ? n(vendorSpend) * 0.007 * 0.5 : 0;
-  const f5 = (n(closeOT) * 0.7 * 12 * (n(apRate) * 1.5)) + (n(reconHrs) * 0.65 * 12 * n(apRate));
+  const f5 = (effCloseOT * 0.7 * 12 * (effApRate * 1.5)) + (effReconHrs * 0.65 * 12 * effApRate);
   const f6 = n(growthStores) * 0.25 * 52000;
 
   const tmdv       = f1 + f2 + f3 + f4 + f5 + f6;
   const netAnnual  = tmdv - n(ottimateAnnual);
   const payback    = tmdv > 0 ? (n(ottimateAnnual) / (tmdv / 12)).toFixed(1) : 'N/A';
   const multiplier = n(netMargin) > 0 ? netAnnual / n(netMargin) : 0;
+  const dailyCost  = tmdv > 0 ? tmdv / 365 : 0;
 
   const ttvProfile = qualScore >= 20
     ? { label: 'Standard',  range: '30-60 days',   color: 'emerald' }
@@ -269,7 +297,7 @@ export default function GroceryDiscoveryWorkshop() {
     { label: 'Growth Scalability',         value: f6, active: n(growthStores) > 0 },
   ];
 
-  const canNext = phase < PHASES.length - 1;
+  const canNext = phase < activePhases.length - 1;
   const canBack = phase > 0;
 
   // ═══ Invoice timeline signal: long = opportunity (green), same-day = already solved (yellow/red) ═══
@@ -284,7 +312,7 @@ export default function GroceryDiscoveryWorkshop() {
     const annualInvoices = n(invoiceVol) * 12;
     const digitalLabel = digitalPct === 'high' ? '70% or more' : digitalPct === 'med' ? '40–70%' : 'fewer than 40%';
     const lineItemLabel = lineItems === 'low' ? 'under 20' : lineItems === 'med' ? '20–50' : lineItems === 'high' ? '50–100' : '100+';
-    const erpLabel = erp === 'qbo' ? 'QuickBooks Online' : erp === 'qbd' ? 'QuickBooks Desktop' : erp === 'sage' ? 'Sage' : erp === 'complex' ? 'a complex ERP environment' : 'your accounting system';
+    const erpLabel = erp === 'qbo' ? 'QuickBooks Online' : erp === 'qbd' ? 'QuickBooks Desktop' : erp === 'sage' ? 'Sage' : erp === 'fms' ? 'FMS' : erp === 'complex' ? 'a complex ERP environment' : 'your accounting system';
     const timelineLabel = invoiceTimeline === 'same' ? 'same day or next day' : invoiceTimeline === 'short' ? '2–3 days' : invoiceTimeline === 'long' ? '7–10+ days' : null;
     const codingLabel = codingPractice === 'line-item' ? 'line-item coding' : codingPractice === 'summary' ? 'summary department splits' : 'a mix of line-item and summary coding';
     const apStr = n(apHeadcount) > 0 ? `${n(apHeadcount)}-person AP team` : 'your AP team';
@@ -307,11 +335,11 @@ export default function GroceryDiscoveryWorkshop() {
       },
       'Invoice Processing Labor': {
         explain: `Your team is spending time on work the system handles automatically — data entry, coding, routing, approval follow-up. The savings here is the difference between what processing costs today versus what it costs with automation handling 85% of invoices, minus the labor to review exceptions.`,
-        calc: `Current: ${n(invoiceVol) * 12} invoices/yr × ${n(manualMin)} min × $${n(apRate)}/hr = ${fmtFull(curCost)}\nAutomated: 85% auto-processed at 2 min each + 15% exceptions at 8 min each = ${fmtFull(autoCost + excCost)}\nYear 1 net (after SKU mapping investment): ${fmtFull(f2y1)}`
+        calc: `Current: ${n(invoiceVol) * 12} invoices/yr × ${effManualMin} min × $${effApRate}/hr = ${fmtFull(curCost)}\nAutomated: 85% auto-processed at 2 min each + 15% exceptions at 8 min each = ${fmtFull(autoCost + excCost)}\nYear 1 net (after SKU mapping investment): ${fmtFull(f2y1)}`
       },
       'Store Operations Recovery': {
-        explain: `Every store location has someone — a GM, receiver, or shift lead — who spends time collecting delivery slips, reconciling paper invoices, and organizing paperwork before it goes to accounting. When invoices are captured digitally at delivery, that time is eliminated.`,
-        calc: `${n(storeCount)} stores × ${n(storeOpsHrs)} hrs/week × 52 weeks × $${n(gmRate)}/hr = ${fmtFull(f3)}`
+        explain: `Every store location has people — GMs, receivers, and department heads — who spend time collecting delivery slips, verifying costs, reconciling paper invoices, and organizing paperwork. Your meat manager, produce manager, and deli lead may each be spending hours checking that what was invoiced matches what was delivered and priced correctly. When invoices are captured and validated digitally, that time is recovered.`,
+        calc: `GM/Receivers: ${n(storeCount)} stores × ${effStoreOpsHrs} hrs/week × 52 weeks × $${effGmRate}/hr = ${fmtFull(f3gmReceiver)}${n(deptHeadCount) > 0 ? `\nDept Heads: ${n(deptHeadCount)} managers × ${n(deptHeadCostHrs) + n(deptHeadAdminHrs)} hrs/week × 52 weeks × $${effDeptHeadRate}/hr = ${fmtFull(f3deptHead)}` : ''}\nTotal: ${fmtFull(f3)}`
       },
       'Vendor Credit Recovery': {
         explain: `Credits, debit memos, and short-pays accumulate when AP doesn't have time to track them systematically. Automated tracking surfaces outstanding credits and flags short-pays so your team can follow up. Industry estimate: 0.7% of vendor spend, 50% recovery rate.`,
@@ -319,7 +347,7 @@ export default function GroceryDiscoveryWorkshop() {
       },
       'Month-End Close Efficiency': {
         explain: `Overtime hours and reconciliation time spike at month-end because invoices aren't fully coded and the books aren't current. Automation keeps the ledger cleaner throughout the month, so close becomes a verification exercise instead of a catch-up sprint.`,
-        calc: `Overtime: ${n(closeOT)} hrs × 70% reduction × 12 months × $${(n(apRate)*1.5).toFixed(0)}/hr (OT rate) = ${fmtFull(n(closeOT)*0.7*12*(n(apRate)*1.5))}\nRecon: ${n(reconHrs)} hrs/month × 65% reduction × 12 months × $${n(apRate)}/hr = ${fmtFull(n(reconHrs)*0.65*12*n(apRate))}`
+        calc: `Overtime: ${effCloseOT} hrs × 70% reduction × 12 months × $${(effApRate*1.5).toFixed(0)}/hr (OT rate) = ${fmtFull(effCloseOT*0.7*12*(effApRate*1.5))}\nRecon: ${effReconHrs} hrs/month × 65% reduction × 12 months × $${effApRate}/hr = ${fmtFull(effReconHrs*0.65*12*effApRate)}`
       },
       'Growth Scalability': {
         explain: `Adding a new location without automation almost always means adding AP capacity — more invoices, more vendors, more manual work. With a mature automation stack, your team absorbs additional locations with minimal incremental labor. This estimates 25% of a fully-loaded AP position ($52K) per new store.`,
@@ -353,6 +381,13 @@ export default function GroceryDiscoveryWorkshop() {
               </div>
             )}
           </div>
+          {dailyCost > 0 && (
+            <div className="mt-6 bg-red-500/20 border border-red-400/30 rounded-xl p-4 text-center">
+              <div className="text-[10px] text-red-300 uppercase tracking-wider mb-1">Daily Cost of Inaction</div>
+              <div className="text-2xl font-black text-red-300 tabular-nums">{fmtFull(dailyCost)}</div>
+              <p className="text-xs text-red-300/70 mt-1">Every day without these recoveries in place</p>
+            </div>
+          )}
         </div>
 
         {/* Section 1: What you told us */}
@@ -578,7 +613,7 @@ export default function GroceryDiscoveryWorkshop() {
 
   // ═══ Render phases ═══
   const renderPhase = () => {
-    switch(PHASES[phase].id) {
+    switch(activePhases[phase].id) {
 
       case 'welcome': return (
         <div className="space-y-6">
@@ -723,9 +758,10 @@ export default function GroceryDiscoveryWorkshop() {
                 {value:'qbo',     label:'QuickBooks Online'},
                 {value:'qbd',     label:'QuickBooks Desktop'},
                 {value:'sage',    label:'Sage (100/300 or Intacct)'},
+                {value:'fms',     label:'FMS (Financial Management Solutions)'},
                 {value:'complex', label:'Acumatica, NetSuite, Oracle, or custom system'}
               ]} />
-            {showSignals && erp && <div className="mt-1 mb-3"><Signal level={erp === 'qbo' ? 'green' : erp === 'qbd' || erp === 'sage' ? 'yellow' : 'red'} /></div>}
+            {showSignals && erp && <div className="mt-1 mb-3"><Signal level={erp === 'qbo' ? 'green' : erp === 'qbd' || erp === 'sage' || erp === 'fms' ? 'yellow' : 'red'} /></div>}
 
             <SelectField label="Who manages your accounting system?" value={erpManaged} onChange={setErpManaged}
               options={[
@@ -765,6 +801,16 @@ export default function GroceryDiscoveryWorkshop() {
 
       case 'team': return (
         <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <h3 className="text-lg font-bold text-slate-800 mb-1">Your Team Structure</h3>
+            <p className="text-xs text-slate-400 mb-4">Who's involved in your invoice and purchasing workflow.</p>
+            <NumField label="How many people are on your AP team?" value={apHeadcount} onChange={setApHeadcount} min={1} max={20}
+              note="Everyone who touches invoice processing — data entry, coding, approvals." />
+            <FramingText text={FRAMING.deptHeads} />
+            <NumField label="How many department or category managers do you have?" value={deptHeadCount} onChange={setDeptHeadCount} min={0} max={30}
+              note="Meat, produce, deli, bakery, grocery — anyone who reviews costs for their area." />
+          </div>
+
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Implementation Ownership</h3>
             <p className="text-xs text-slate-400 mb-4">The people and bandwidth behind the project.</p>
@@ -813,30 +859,37 @@ export default function GroceryDiscoveryWorkshop() {
       case 'costs': return (
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h3 className="text-lg font-bold text-slate-800 mb-1">Your AP Team & Process</h3>
-            <p className="text-xs text-slate-400 mb-4">These numbers build the labor impact calculation.</p>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">AP Processing Costs</h3>
+            <p className="text-xs text-slate-400 mb-4">What it costs your AP team to process invoices today.</p>
             <div className="grid grid-cols-2 gap-4">
-              <NumField label="AP team headcount" value={apHeadcount} onChange={setApHeadcount} min={1} max={20}
-                note="People who touch invoice processing" />
-              <NumField label="Fully-loaded hourly rate" value={apRate} onChange={setApRate} min={15} max={55} prefix="$" suffix="/hr"
+              <NumField label="Fully-loaded AP hourly rate" value={apRate} onChange={setApRate} min={15} max={55} prefix="$" suffix="/hr"
                 note="Base + benefits + taxes + overhead" />
               <NumField label="Minutes per invoice (manual)" value={manualMin} onChange={setManualMin} min={2} max={30} suffix="min"
                 note="Average, not best case" />
-              <SelectField label="Current coding practice" value={codingPractice} onChange={setCodingPractice}
-                options={[
-                  {value:'line-item', label:'Already coding at line-item level'},
-                  {value:'summary',   label:'Summary splits (% by department)'},
-                  {value:'mixed',     label:'Mixed — depends on the vendor'}
-                ]} />
             </div>
+            <SelectField label="Current coding practice" value={codingPractice} onChange={setCodingPractice}
+              options={[
+                {value:'line-item', label:'Already coding at line-item level'},
+                {value:'summary',   label:'Summary splits (% by department)'},
+                {value:'mixed',     label:'Mixed — depends on the vendor'}
+              ]} />
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h3 className="text-lg font-bold text-slate-800 mb-1">Store Operations & Month-End</h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-1">Store & Department Costs</h3>
+            <p className="text-xs text-slate-400 mb-4">Time and cost for GMs, receivers, and department heads on invoice-related work.</p>
             <div className="grid grid-cols-2 gap-4">
-              <NumField label="Store ops hours/week on invoice paperwork" value={storeOpsHrs} onChange={setStoreOpsHrs} min={0} max={15} suffix="hrs/store"
-                note="GM/receiver time collecting slips, organizing receipts" />
+              <NumField label="GM/receiver hours/week on invoice paperwork" value={storeOpsHrs} onChange={setStoreOpsHrs} min={0} max={15} suffix="hrs/store"
+                note="Collecting slips, organizing receipts, reconciling deliveries" />
               <NumField label="GM/store manager hourly rate" value={gmRate} onChange={setGmRate} min={20} max={60} prefix="$" suffix="/hr" />
+              <NumField label="Dept head hours/week verifying costs" value={deptHeadCostHrs} onChange={setDeptHeadCostHrs} min={0} max={20} suffix="hrs/week"
+                note="Checking invoices match what was delivered and priced correctly" />
+              <NumField label="Dept head hours/week on invoice admin" value={deptHeadAdminHrs} onChange={setDeptHeadAdminHrs} min={0} max={20} suffix="hrs/week"
+                note="Organizing paperwork, matching credits, reconciling statements" />
+              <NumField label="Department head hourly rate" value={deptHeadRate} onChange={setDeptHeadRate} min={15} max={60} prefix="$" suffix="/hr"
+                note="Base + benefits + taxes + overhead" />
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-100">
               <NumField label="Month-end close overtime hours" value={closeOT} onChange={setCloseOT} min={0} max={50} suffix="hrs/close"
                 note="Extra hours per month-end" />
               <NumField label="Monthly reconciliation hours" value={reconHrs} onChange={setReconHrs} min={0} max={80} suffix="hrs/month"
@@ -968,6 +1021,16 @@ export default function GroceryDiscoveryWorkshop() {
               )}
             </div>
 
+            {dailyCost > 0 && (
+              <div className="bg-gradient-to-r from-red-900/60 to-orange-900/60 rounded-xl p-4 mt-4 border border-red-700/30">
+                <div className="text-[10px] text-red-300 uppercase tracking-wider mb-1">Daily Cost of Inaction</div>
+                <div className="text-2xl font-black text-red-300 tabular-nums">{fmtFull(dailyCost)}</div>
+                <p className="text-xs text-red-400/80 mt-2 leading-relaxed">
+                  Every day without these recoveries in place costs your operation <span className="font-bold text-white">{fmtFull(dailyCost)}</span>. That's money leaving your margins today.
+                </p>
+              </div>
+            )}
+
             {n(netMargin) > 0 && netAnnual > 0 && (
               <div className="bg-gradient-to-r from-blue-900/60 to-indigo-900/60 rounded-xl p-4 mt-4 border border-blue-700/30">
                 <div className="text-[10px] text-blue-300 uppercase tracking-wider mb-1">What This Means For Your Margins</div>
@@ -1038,10 +1101,12 @@ export default function GroceryDiscoveryWorkshop() {
           </div>
           <div className="flex items-center gap-2">
             {prospectName && <span className="text-xs text-slate-400">{prospectName}</span>}
-            <button onClick={() => setShowSignals(!showSignals)}
-              className={`text-[10px] px-3 py-1.5 rounded-full border transition-all ${showSignals ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'}`}>
-              {showSignals ? '● Signals On' : '○ Signals Off'}
-            </button>
+            {isInternal && (
+              <button onClick={() => setShowSignals(!showSignals)}
+                className={`text-[10px] px-3 py-1.5 rounded-full border transition-all ${showSignals ? 'bg-amber-500/20 border-amber-500/50 text-amber-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'}`}>
+                {showSignals ? '● Signals On' : '○ Signals Off'}
+              </button>
+            )}
             <button onClick={() => setShowImpact(!showImpact)}
               className={`text-[10px] px-3 py-1.5 rounded-full border transition-all ${showImpact ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'}`}>
               {showImpact ? '● Impact On' : '○ Impact Off'}
@@ -1067,7 +1132,7 @@ export default function GroceryDiscoveryWorkshop() {
       <div className="max-w-4xl mx-auto px-6 py-6">
         {/* Phase nav */}
         <div className="flex items-center gap-1 mb-6 overflow-x-auto pb-2">
-          {PHASES.map((p, i) => (
+          {activePhases.map((p, i) => (
             <button key={p.id} onClick={() => setPhase(i)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 i === phase ? 'bg-blue-600 text-white shadow-md' : i < phase ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
@@ -1077,7 +1142,7 @@ export default function GroceryDiscoveryWorkshop() {
         </div>
 
         {/* Qual score bar (AE view, signals on, middle phases) */}
-        {showSignals && phase >= 2 && phase < PHASES.length - 1 && (
+        {isInternal && showSignals && phase >= 2 && phase < activePhases.length - 1 && (
           <div className={`mb-4 px-4 py-2 rounded-lg flex items-center justify-between text-xs border ${qualLevel === 'green' ? 'bg-emerald-50 border-emerald-200' : qualLevel === 'yellow' ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
             <span className="text-slate-600">Onboarding Profile: <span className="font-bold">{qualLabel}</span></span>
             <span className="text-slate-500">{pathNames[autoPath]}</span>
@@ -1093,10 +1158,10 @@ export default function GroceryDiscoveryWorkshop() {
             className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${canBack ? 'bg-slate-200 text-slate-700 hover:bg-slate-300' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>
             ← Back
           </button>
-          <span className="text-xs text-slate-400">{phase + 1} of {PHASES.length}</span>
+          <span className="text-xs text-slate-400">{phase + 1} of {activePhases.length}</span>
           <button onClick={() => canNext && setPhase(phase + 1)} disabled={!canNext}
             className={`px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${canNext ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' : 'bg-slate-100 text-slate-300 cursor-not-allowed'}`}>
-            {phase === PHASES.length - 2 ? 'See Your Impact →' : 'Continue →'}
+            {phase === activePhases.length - 2 ? 'See Your Impact →' : 'Continue →'}
           </button>
         </div>
       </div>
