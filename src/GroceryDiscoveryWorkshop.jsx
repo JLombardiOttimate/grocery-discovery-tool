@@ -1,10 +1,11 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase = (SUPABASE_URL && SUPABASE_KEY)
+  ? createClient(SUPABASE_URL, SUPABASE_KEY)
+  : null;
 
 // ═══ Safe number helper ═══
 const n = (v) => (v === '' || v === undefined || v === null || isNaN(v)) ? 0 : Number(v);
@@ -226,6 +227,7 @@ export default function GroceryDiscoveryWorkshop() {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('session');
     if (!token) return;
+    if (!supabase) return;
     setSaveState('loading');
     supabase
       .from('grocery_discovery_sessions')
@@ -1207,6 +1209,7 @@ export default function GroceryDiscoveryWorkshop() {
       full_state: fullState,
       updated_at: new Date().toISOString(),
     };
+    if (!supabase) { setSaveState('error'); setTimeout(() => setSaveState('idle'), 3000); return; }
     try {
       let token = sessionToken;
       if (token) {
