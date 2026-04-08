@@ -1,4 +1,10 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 // ═══ Safe number helper ═══
 const n = (v) => (v === '' || v === undefined || v === null || isNaN(v)) ? 0 : Number(v);
@@ -211,6 +217,69 @@ export default function GroceryDiscoveryWorkshop() {
   const [dsdSpend, setDsdSpend] = useState(1000000);
   const [netMargin, setNetMargin] = useState(0.02);
   const [ottimateAnnual, setOttimateAnnual] = useState('');
+
+  // ─── Session persistence ───
+  const [sessionToken, setSessionToken] = useState(null);
+  const [saveState, setSaveState] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'loading' | 'error'
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('session');
+    if (!token) return;
+    setSaveState('loading');
+    supabase
+      .from('grocery_discovery_sessions')
+      .select('full_state, share_token')
+      .eq('share_token', token)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) { setSaveState('error'); setTimeout(() => setSaveState('idle'), 3000); return; }
+        const s = data.full_state;
+        setProspectName(s.prospectName ?? '');
+        if (s.phase !== undefined) setPhase(s.phase);
+        if (s.showImpact !== undefined) setShowImpact(s.showImpact);
+        if (s.showSummary !== undefined) setShowSummary(s.showSummary);
+        if (s.expandedCalcs !== undefined) setExpandedCalcs(s.expandedCalcs);
+        setInvoiceVol(s.invoiceVol ?? '');
+        setInvoiceSplitting(s.invoiceSplitting ?? '');
+        setDigitalPct(s.digitalPct ?? '');
+        setLineItems(s.lineItems ?? '');
+        setInvoiceTimeline(s.invoiceTimeline ?? '');
+        setVendorCount(s.vendorCount ?? '');
+        setVendorTurnover(s.vendorTurnover ?? '');
+        setStoreCount(s.storeCount ?? '');
+        setVendorClean(s.vendorClean ?? '');
+        setItemCatalog(s.itemCatalog ?? '');
+        setCoaStructure(s.coaStructure ?? '');
+        setPricingMaint(s.pricingMaint ?? '');
+        setErp(s.erp ?? '');
+        setErpManaged(s.erpManaged ?? '');
+        setScanning(s.scanning ?? '');
+        setTechSkills(s.techSkills ?? '');
+        setApHeadcount(s.apHeadcount ?? '');
+        setDeptHeadCount(s.deptHeadCount ?? '');
+        setImplOwner(s.implOwner ?? '');
+        setTimeline(s.timeline ?? '');
+        setSuccessMetrics(s.successMetrics ?? '');
+        setApRate(s.apRate ?? '');
+        setManualMin(s.manualMin ?? '');
+        setCodingPractice(s.codingPractice ?? 'summary');
+        setStoreOpsHrs(s.storeOpsHrs ?? '');
+        setGmRate(s.gmRate ?? '');
+        setDeptHeadCostHrs(s.deptHeadCostHrs ?? '');
+        setDeptHeadAdminHrs(s.deptHeadAdminHrs ?? '');
+        setDeptHeadRate(s.deptHeadRate ?? '');
+        setCloseOT(s.closeOT ?? '');
+        setReconHrs(s.reconHrs ?? '');
+        setGrowthStores(s.growthStores ?? '');
+        if (s.vendorSpend !== undefined) setVendorSpend(s.vendorSpend);
+        if (s.dsdSpend !== undefined) setDsdSpend(s.dsdSpend);
+        if (s.netMargin !== undefined) setNetMargin(s.netMargin);
+        setOttimateAnnual(s.ottimateAnnual ?? '');
+        setSessionToken(data.share_token);
+        setSaveState('idle');
+      });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ═══ SDR defaults — when SDR mode skips the Costs phase, use industry averages ═══
   const effApRate = isSDR && !apRate ? 25 : n(apRate);
@@ -1089,6 +1158,84 @@ export default function GroceryDiscoveryWorkshop() {
     }
   };
 
+  // ═══ Save session to Supabase ═══
+  const handleSave = async () => {
+    setSaveState('saving');
+    const fullState = {
+      prospectName, phase, showImpact, showSummary, expandedCalcs,
+      invoiceVol, invoiceSplitting, digitalPct, lineItems, invoiceTimeline,
+      vendorCount, vendorTurnover, storeCount,
+      vendorClean, itemCatalog, coaStructure, pricingMaint,
+      erp, erpManaged, scanning, techSkills,
+      apHeadcount, deptHeadCount, implOwner, timeline, successMetrics,
+      apRate, manualMin, codingPractice, storeOpsHrs, gmRate,
+      deptHeadCostHrs, deptHeadAdminHrs, deptHeadRate, closeOT, reconHrs,
+      growthStores, vendorSpend, dsdSpend, netMargin, ottimateAnnual,
+    };
+    const payload = {
+      prospect_name: prospectName || null,
+      mode,
+      invoice_vol: n(invoiceVol) || null,
+      invoice_splitting: invoiceSplitting || null,
+      digital_pct: digitalPct || null,
+      line_items: lineItems || null,
+      invoice_timeline: invoiceTimeline || null,
+      vendor_count: n(vendorCount) || null,
+      vendor_turnover: vendorTurnover || null,
+      store_count: n(storeCount) || null,
+      vendor_clean: vendorClean || null,
+      item_catalog: itemCatalog || null,
+      coa_structure: coaStructure || null,
+      pricing_maint: pricingMaint || null,
+      erp: erp || null,
+      erp_managed: erpManaged || null,
+      scanning: scanning || null,
+      tech_skills: techSkills || null,
+      impl_owner: implOwner || null,
+      timeline: timeline || null,
+      success_metrics: successMetrics || null,
+      vendor_spend: n(vendorSpend) || null,
+      dsd_spend: n(dsdSpend) || null,
+      net_margin: n(netMargin) || null,
+      ottimate_annual: n(ottimateAnnual) || null,
+      qual_score: qualScore,
+      qual_level: qualLevel,
+      auto_path: autoPath,
+      tmdv: tmdv || null,
+      net_annual: netAnnual || null,
+      payback: payback !== 'N/A' ? parseFloat(payback) : null,
+      full_state: fullState,
+      updated_at: new Date().toISOString(),
+    };
+    try {
+      let token = sessionToken;
+      if (token) {
+        await supabase.from('grocery_discovery_sessions').update(payload).eq('share_token', token);
+        navigator.clipboard.writeText(window.location.href);
+      } else {
+        const { data, error } = await supabase
+          .from('grocery_discovery_sessions')
+          .insert(payload)
+          .select('share_token')
+          .single();
+        if (error) { setSaveState('error'); setTimeout(() => setSaveState('idle'), 3000); return; }
+        token = data.share_token;
+        setSessionToken(token);
+        const pageUrl = new URL(window.location.href);
+        pageUrl.searchParams.set('session', token);
+        window.history.pushState({}, '', pageUrl.toString());
+        // Share URL strips mode so prospects see the customer view
+        const shareUrl = `${window.location.origin}${window.location.pathname}?session=${token}`;
+        navigator.clipboard.writeText(shareUrl);
+      }
+      setSaveState('saved');
+      setTimeout(() => setSaveState('idle'), 3000);
+    } catch {
+      setSaveState('error');
+      setTimeout(() => setSaveState('idle'), 3000);
+    }
+  };
+
   // ═══ Main render ═══
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100" style={{ fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif" }}>
@@ -1110,6 +1257,21 @@ export default function GroceryDiscoveryWorkshop() {
             <button onClick={() => setShowImpact(!showImpact)}
               className={`text-[10px] px-3 py-1.5 rounded-full border transition-all ${showImpact ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300'}`}>
               {showImpact ? '● Impact On' : '○ Impact Off'}
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saveState === 'saving' || saveState === 'loading'}
+              className={`no-print text-[10px] px-3 py-1.5 rounded-full border transition-all disabled:opacity-50 ${
+                saveState === 'saved'  ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400' :
+                saveState === 'error'  ? 'bg-red-500/20 border-red-500/50 text-red-400' :
+                saveState === 'loading' ? 'bg-slate-800 border-slate-700 text-slate-400' :
+                'bg-blue-500/20 border-blue-500/50 text-blue-400 hover:bg-blue-500/30'
+              }`}>
+              {saveState === 'saving'  ? '⏳ Saving...' :
+               saveState === 'saved'   ? '✓ Link copied!' :
+               saveState === 'loading' ? '⏳ Loading...' :
+               saveState === 'error'   ? '✗ Error — retry' :
+               sessionToken            ? '↑ Save & Copy Link' : '↑ Save Session'}
             </button>
           </div>
         </div>
