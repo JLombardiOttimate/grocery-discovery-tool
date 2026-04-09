@@ -324,10 +324,9 @@ export default function GroceryDiscoveryWorkshop() {
   // ═══ ROI Calculations ═══
   const actualAnnualVol = n(invoiceVol) * 12;
 
-  const accAdj = digitalPct === 'high' ? 0.92 : digitalPct === 'med' ? 0.85 : 0.75;
-  const f1IV  = (autoPath === 2 || autoPath === 4) ? n(vendorSpend) * 0.005 * accAdj : 0;
+  const f1IV  = (autoPath === 2 || autoPath === 4) ? n(vendorSpend) * 0.005 : 0;
   const f1DSD = (autoPath === 3 || autoPath === 4) ? n(dsdSpend) * 0.04 * 0.85 : 0;
-  const f1IVAdj = autoPath === 4 ? Math.max(0, n(vendorSpend) - n(dsdSpend)) * 0.005 * accAdj : f1IV;
+  const f1IVAdj = autoPath === 4 ? Math.max(0, n(vendorSpend) - n(dsdSpend)) * 0.005 : f1IV;
   const f1 = autoPath >= 2 ? (autoPath === 4 ? f1DSD + f1IVAdj : autoPath === 3 ? f1DSD : f1IV) : 0;
 
   const autoRate = 0.65;
@@ -402,7 +401,7 @@ export default function GroceryDiscoveryWorkshop() {
     const calcDetails = {
       'Pricing Variance Recovery': {
         explain: `When vendors invoice at prices above your negotiated rates, those overcharges go undetected until someone manually cross-references — which rarely happens at scale. Industry data across 481 million invoices puts the average pricing variance at 1.2% of vendor spend. We apply a conservative 0.5% rate and adjust for your invoice format mix.`,
-        calc: `${fmtFull(n(vendorSpend))} vendor spend × 0.5% variance rate${digitalPct ? ` × ${accAdj * 100}% accuracy factor` : ''} = ${fmtFull(f1)}`
+        calc: `${fmtFull(n(vendorSpend))} vendor spend × 0.5% variance rate = ${fmtFull(f1)}`
       },
       'Invoice Processing Labor': {
         explain: `Your team is spending time on work the system handles automatically — data entry, coding, routing, approval follow-up. The savings here is the difference between what processing costs today versus what it costs with automation handling 65% of invoices, minus the labor to review exceptions.`,
