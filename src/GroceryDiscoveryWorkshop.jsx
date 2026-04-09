@@ -47,9 +47,9 @@ const FRAMING = {
 
 // ═══ Impact tooltip definitions ═══
 const IMPACT_TOOLTIPS = {
-  'Pricing Variance Recovery': "Vendors overcharge more than you'd expect — industry data across 481M invoices (Xelix 2026) puts the benchmark at 1.2% of vendor spend. We apply a 75% capture rate and adjust for your invoice mix. This is the value of pricing errors caught before payment rather than chased down after.",
+  'Pricing Variance Recovery': "Vendors overcharge more than you'd expect — industry data across 481M invoices (Xelix 2026) puts the benchmark at 1.2% of vendor spend. We apply a conservative 0.5% rate and adjust for your invoice mix. This is the value of pricing errors caught before payment rather than chased down after.",
   'Invoice Processing Labor': "Your current cost per invoice (minutes × hourly rate) minus the automated cost (roughly 2 min for exceptions only) minus the labor for handling the exceptions that automation flags. Year 1 includes a one-time investment to map your SKU base to GL codes.",
-  'Store Operations Recovery': "The hours your GMs, receivers, and department heads spend physically handling paper invoices, verifying costs, organizing delivery slips, and reconciling receipts — multiplied across every location, every week. Department heads like your meat, produce, and deli managers often spend significant time checking that what was invoiced matches what was delivered and priced correctly. This time goes away when invoices are captured and validated digitally.",
+  'Store Operations Recovery': "The hours your GMs, receivers, and department heads spend physically handling paper invoices, verifying costs, organizing delivery slips, and reconciling receipts — multiplied across every location, every week. Department heads like your meat, produce, and deli managers often spend significant time checking that what was invoiced matches what was delivered and priced correctly. This time is conservatively reduced by 50% when invoices are captured and validated digitally.",
   'Vendor Credit Recovery': "Credits, debit memos, and short-pays that go untracked because AP doesn't have time to follow up systematically. With automated tracking, these get surfaced and claimed. Estimate: 0.7% of vendor spend at a 50% recovery rate.",
   'Month-End Close Efficiency': "The overtime and reconciliation hours that pile up every close cycle because AP is catching up rather than staying current. Automation keeps the books cleaner in real time, so close is a verification step instead of a catch-up sprint. Estimated at 70% reduction in overtime hours and 65% reduction in reconciliation time.",
   'Growth Scalability': "Adding a store without AP automation usually means adding AP headcount. With a mature system, your team absorbs new volume with minimal incremental labor. This estimates 25% of a $52K fully-loaded AP position in cost avoidance per new store planned."
@@ -174,7 +174,7 @@ export default function GroceryDiscoveryWorkshop() {
   const [prospectName, setProspectName] = useState('');
 
   // ─── Phase 1: Operation ───
-  const [invoiceVol, setInvoiceVol] = useState('');
+  const [invoiceVol, setInvoiceVol] = useState(2000);
   const [invoiceSplitting, setInvoiceSplitting] = useState('');
   const [digitalPct, setDigitalPct] = useState('');
   const [lineItems, setLineItems] = useState('');
@@ -325,12 +325,12 @@ export default function GroceryDiscoveryWorkshop() {
   const actualAnnualVol = n(invoiceVol) * 12;
 
   const accAdj = digitalPct === 'high' ? 0.92 : digitalPct === 'med' ? 0.85 : 0.75;
-  const f1IV  = (autoPath === 2 || autoPath === 4) ? n(vendorSpend) * 0.012 * 0.75 * accAdj : 0;
+  const f1IV  = (autoPath === 2 || autoPath === 4) ? n(vendorSpend) * 0.005 * accAdj : 0;
   const f1DSD = (autoPath === 3 || autoPath === 4) ? n(dsdSpend) * 0.04 * 0.85 : 0;
-  const f1IVAdj = autoPath === 4 ? Math.max(0, n(vendorSpend) - n(dsdSpend)) * 0.012 * 0.75 * accAdj : f1IV;
+  const f1IVAdj = autoPath === 4 ? Math.max(0, n(vendorSpend) - n(dsdSpend)) * 0.005 * accAdj : f1IV;
   const f1 = autoPath >= 2 ? (autoPath === 4 ? f1DSD + f1IVAdj : autoPath === 3 ? f1DSD : f1IV) : 0;
 
-  const autoRate = 0.85;
+  const autoRate = 0.65;
   const curCost       = actualAnnualVol * effManualMin * (effApRate / 60);
   const autoCost      = actualAnnualVol * autoRate * 2 * (effApRate / 60);
   const excCost       = actualAnnualVol * (1 - autoRate) * 8 * (effApRate / 60);
@@ -342,7 +342,7 @@ export default function GroceryDiscoveryWorkshop() {
 
   const f3gmReceiver = n(storeCount) * effStoreOpsHrs * 52 * effGmRate;
   const f3deptHead = n(deptHeadCount) * (n(deptHeadCostHrs) + n(deptHeadAdminHrs)) * 52 * effDeptHeadRate;
-  const f3 = f3gmReceiver + f3deptHead;
+  const f3 = (f3gmReceiver + f3deptHead) * 0.5;
   const f4 = (autoPath === 2 || autoPath === 4) ? n(vendorSpend) * 0.007 * 0.5 : 0;
   const f5 = (effCloseOT * 0.7 * 12 * (effApRate * 1.5)) + (effReconHrs * 0.65 * 12 * effApRate);
   const f6 = n(growthStores) * 0.25 * 52000;
@@ -401,16 +401,16 @@ export default function GroceryDiscoveryWorkshop() {
     // ─ Section 2 category details ─
     const calcDetails = {
       'Pricing Variance Recovery': {
-        explain: `When vendors invoice at prices above your negotiated rates, those overcharges go undetected until someone manually cross-references — which rarely happens at scale. Industry data across 481 million invoices puts the average pricing variance at 1.2% of vendor spend. We apply a 75% capture rate and adjust for your invoice format mix.`,
-        calc: `${fmtFull(n(vendorSpend))} vendor spend × 1.2% variance rate × 75% capture rate${digitalPct ? ` × ${accAdj * 100}% accuracy factor` : ''} = ${fmtFull(f1)}`
+        explain: `When vendors invoice at prices above your negotiated rates, those overcharges go undetected until someone manually cross-references — which rarely happens at scale. Industry data across 481 million invoices puts the average pricing variance at 1.2% of vendor spend. We apply a conservative 0.5% rate and adjust for your invoice format mix.`,
+        calc: `${fmtFull(n(vendorSpend))} vendor spend × 0.5% variance rate${digitalPct ? ` × ${accAdj * 100}% accuracy factor` : ''} = ${fmtFull(f1)}`
       },
       'Invoice Processing Labor': {
-        explain: `Your team is spending time on work the system handles automatically — data entry, coding, routing, approval follow-up. The savings here is the difference between what processing costs today versus what it costs with automation handling 85% of invoices, minus the labor to review exceptions.`,
-        calc: `Current: ${n(invoiceVol) * 12} invoices/yr × ${effManualMin} min × $${effApRate}/hr = ${fmtFull(curCost)}\nAutomated: 85% auto-processed at 2 min each + 15% exceptions at 8 min each = ${fmtFull(autoCost + excCost)}\nYear 1 net (after SKU mapping investment): ${fmtFull(f2y1)}`
+        explain: `Your team is spending time on work the system handles automatically — data entry, coding, routing, approval follow-up. The savings here is the difference between what processing costs today versus what it costs with automation handling 65% of invoices, minus the labor to review exceptions.`,
+        calc: `Current: ${n(invoiceVol) * 12} invoices/yr × ${effManualMin} min × $${effApRate}/hr = ${fmtFull(curCost)}\nAutomated: 65% auto-processed at 2 min each + 35% exceptions at 8 min each = ${fmtFull(autoCost + excCost)}\nYear 1 net (after SKU mapping investment): ${fmtFull(f2y1)}`
       },
       'Store Operations Recovery': {
-        explain: `Every store location has people — GMs, receivers, and department heads — who spend time collecting delivery slips, verifying costs, reconciling paper invoices, and organizing paperwork. Your meat manager, produce manager, and deli lead may each be spending hours checking that what was invoiced matches what was delivered and priced correctly. When invoices are captured and validated digitally, that time is recovered.`,
-        calc: `GM/Receivers: ${n(storeCount)} stores × ${effStoreOpsHrs} hrs/week × 52 weeks × $${effGmRate}/hr = ${fmtFull(f3gmReceiver)}${n(deptHeadCount) > 0 ? `\nDept Heads: ${n(deptHeadCount)} managers × ${n(deptHeadCostHrs) + n(deptHeadAdminHrs)} hrs/week × 52 weeks × $${effDeptHeadRate}/hr = ${fmtFull(f3deptHead)}` : ''}\nTotal: ${fmtFull(f3)}`
+        explain: `Every store location has people — GMs, receivers, and department heads — who spend time collecting delivery slips, verifying costs, reconciling paper invoices, and organizing paperwork. Your meat manager, produce manager, and deli lead may each be spending hours checking that what was invoiced matches what was delivered and priced correctly. When invoices are captured and validated digitally, that time is conservatively reduced by roughly half.`,
+        calc: `GM/Receivers: ${n(storeCount)} stores × ${effStoreOpsHrs} hrs/week × 52 weeks × $${effGmRate}/hr = ${fmtFull(f3gmReceiver)}${n(deptHeadCount) > 0 ? `\nDept Heads: ${n(deptHeadCount)} managers × ${n(deptHeadCostHrs) + n(deptHeadAdminHrs)} hrs/week × 52 weeks × $${effDeptHeadRate}/hr = ${fmtFull(f3deptHead)}` : ''}\nTotal (at 50% labor reduction): ${fmtFull(f3)}`
       },
       'Vendor Credit Recovery': {
         explain: `Credits, debit memos, and short-pays accumulate when AP doesn't have time to track them systematically. Automated tracking surfaces outstanding credits and flags short-pays so your team can follow up. Industry estimate: 0.7% of vendor spend, 50% recovery rate.`,
@@ -643,7 +643,7 @@ export default function GroceryDiscoveryWorkshop() {
                 <div>
                   <div className="text-sm font-semibold text-slate-800">Pricing Variance Exposure</div>
                   <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-                    Industry benchmark data across <span className="font-semibold">481 million invoices</span> puts average pricing variance at <span className="font-semibold">1.2% of vendor spend</span> (Xelix, 2026). At your scale, that's approximately <span className="font-semibold">{fmtFull(n(vendorSpend) * 0.012)}/year</span> in potential overcharges — most of which goes uncaptured without automated line-item matching.
+                    Industry benchmark data across <span className="font-semibold">481 million invoices</span> puts average pricing variance at <span className="font-semibold">1.2% of vendor spend</span> (Xelix, 2026). We model a conservative <span className="font-semibold">0.5%</span> — at your scale, that's approximately <span className="font-semibold">{fmtFull(n(vendorSpend) * 0.005)}/year</span> in recoverable overcharges without automated line-item matching.
                   </p>
                 </div>
               </div>
@@ -712,8 +712,16 @@ export default function GroceryDiscoveryWorkshop() {
             <h3 className="text-lg font-bold text-slate-800 mb-1">Invoice Volume & Complexity</h3>
             <p className="text-xs text-slate-400 mb-4">Understanding what hits your AP desk every month.</p>
             <FramingText text={FRAMING.invoiceVol} />
-            <NumField label="What's your average monthly invoice volume across all locations?" value={invoiceVol} onChange={setInvoiceVol} min={0} max={50000}
-              note="Include everything: broadline, DSD, specialty, one-offs." />
+            <SliderField
+              label="What's your average monthly invoice volume across all locations?"
+              value={invoiceVol}
+              onChange={setInvoiceVol}
+              min={500}
+              max={100000}
+              step={500}
+              markers={['500', '25K', '50K', '75K', '100K']}
+              note="Include everything: broadline, DSD, specialty, one-offs."
+            />
             <SelectField label="Do any vendors split deliveries into multiple invoices?"
               value={invoiceSplitting} onChange={setInvoiceSplitting}
               options={[
@@ -1117,7 +1125,7 @@ export default function GroceryDiscoveryWorkshop() {
               <div className="space-y-1 text-xs text-slate-400">
                 {n(manualMin) > 0 && <p>Your processing time of {n(manualMin)} min/invoice vs. 2 min/invoice with automation.</p>}
                 {digitalPct && <p>Your digital invoice ratio: {digitalPct === 'high' ? '70%+ (strong)' : digitalPct === 'med' ? '40-70% (moderate)' : 'under 40% (challenging)'} — extraction accuracy scales directly with this.</p>}
-                <p>Pricing variance benchmark: 1.2% of vendor spend (Xelix 2026, 481M invoices).</p>
+                <p>Pricing variance benchmark: 1.2% of vendor spend (Xelix 2026, 481M invoices) — modeled conservatively at 0.5%.</p>
                 {n(netMargin) > 0 && <p>At {(n(netMargin)*100).toFixed(1)}% net margin, every $1 recovered = ${Math.round(1/n(netMargin))} in equivalent new revenue.</p>}
               </div>
             </div>
