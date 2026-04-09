@@ -977,9 +977,9 @@ export default function GroceryDiscoveryWorkshop() {
               value={vendorSpend}
               onChange={setVendorSpend}
               min={500000}
-              max={200000000}
+              max={500000000}
               step={1000000}
-              markers={['$500K', '$50M', '$100M', '$150M', '$200M']}
+              markers={['$500K', '$125M', '$250M', '$375M', '$500M']}
               note="All vendors flowing through AP — broadline, DSD, specialty, local"
             />
             <SliderField
@@ -987,9 +987,9 @@ export default function GroceryDiscoveryWorkshop() {
               value={dsdSpend}
               onChange={setDsdSpend}
               min={0}
-              max={150000000}
+              max={250000000}
               step={500000}
-              markers={['$0', '$37.5M', '$75M', '$112.5M', '$150M']}
+              markers={['$0', '$62.5M', '$125M', '$187.5M', '$250M']}
               note="Pepsi, Coke, local bakeries, produce — direct store delivery vendors only"
             />
 
