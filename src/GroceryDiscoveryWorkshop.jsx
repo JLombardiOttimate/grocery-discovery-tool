@@ -109,13 +109,13 @@ function NumField({ label, value, onChange, min, max, step=1, prefix='', suffix=
   );
 }
 
-function SliderField({ label, value, onChange, min, max, step, prefix='$', note='', markers=[] }) {
+function SliderField({ label, value, onChange, min, max, step, prefix='$', note='', markers=[], formatValue=fmtSlider }) {
   const pct = max > min ? ((n(value) - min) / (max - min)) * 100 : 0;
   return (
     <div className="mb-5">
       <div className="flex items-center justify-between mb-1.5">
         <label className="text-sm font-medium text-slate-700">{label}</label>
-        <span className="text-sm font-bold text-slate-800 tabular-nums">{fmtSlider(n(value))}</span>
+        <span className="text-sm font-bold text-slate-800 tabular-nums">{formatValue(n(value))}</span>
       </div>
       <div className="relative">
         <input
@@ -720,6 +720,7 @@ export default function GroceryDiscoveryWorkshop() {
               step={500}
               markers={['500', '25K', '50K', '75K', '100K']}
               note="Include everything: broadline, DSD, specialty, one-offs."
+              formatValue={v => v >= 1000 ? `${Math.round(v / 1000)}K` : v.toLocaleString()}
             />
             <SelectField label="Do any vendors split deliveries into multiple invoices?"
               value={invoiceSplitting} onChange={setInvoiceSplitting}
