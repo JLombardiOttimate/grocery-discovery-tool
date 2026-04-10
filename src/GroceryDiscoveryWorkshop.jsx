@@ -93,6 +93,28 @@ function Tooltip({ text, children }) {
   );
 }
 
+// ═══ Field Toggle Wrapper ═══
+function ToggleWrap({ fieldKey, disabledFields, onToggle, children }) {
+  const isOff = disabledFields.includes(fieldKey);
+  return (
+    <div className="relative">
+      <button
+        onClick={() => onToggle(fieldKey)}
+        className={`absolute top-0 right-0 z-10 text-[9px] px-2 py-0.5 rounded-full border transition-all ${
+          isOff
+            ? 'text-blue-500 border-blue-200 bg-blue-50 hover:bg-blue-100'
+            : 'text-slate-400 border-slate-200 hover:text-slate-600 bg-white'
+        }`}
+      >
+        {isOff ? '+ Include' : 'Skip'}
+      </button>
+      <div className={isOff ? 'opacity-40 pointer-events-none select-none' : ''}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // ═══ Input Components ═══
 function NumField({ label, value, onChange, min, max, step=1, prefix='', suffix='', note='' }) {
   return (
@@ -170,6 +192,10 @@ export default function GroceryDiscoveryWorkshop() {
   const [showImpact, setShowImpact] = useState(false);
   const [showSignals, setShowSignals] = useState(false); // only toggleable in internal mode
   const [showSummary, setShowSummary] = useState(false);
+  const [disabledFields, setDisabledFields] = useState([]);
+  const toggleField = (field) => setDisabledFields(prev =>
+    prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]
+  );
   const [expandedCalcs, setExpandedCalcs] = useState({});
   const [prospectName, setProspectName] = useState('');
 
@@ -242,6 +268,7 @@ export default function GroceryDiscoveryWorkshop() {
         if (s.showImpact !== undefined) setShowImpact(s.showImpact);
         if (s.showSummary !== undefined) setShowSummary(s.showSummary);
         if (s.expandedCalcs !== undefined) setExpandedCalcs(s.expandedCalcs);
+        if (s.disabledFields !== undefined) setDisabledFields(s.disabledFields);
         setInvoiceVol(s.invoiceVol ?? '');
         setInvoiceSplitting(s.invoiceSplitting ?? '');
         setDigitalPct(s.digitalPct ?? '');
@@ -284,13 +311,24 @@ export default function GroceryDiscoveryWorkshop() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ═══ SDR defaults — when SDR mode skips the Costs phase, use industry averages ═══
-  const effApRate = isSDR && !apRate ? 25 : n(apRate);
-  const effManualMin = isSDR && !manualMin ? 12 : n(manualMin);
-  const effGmRate = isSDR && !gmRate ? 30 : n(gmRate);
-  const effStoreOpsHrs = isSDR && !storeOpsHrs ? 3 : n(storeOpsHrs);
-  const effDeptHeadRate = isSDR && !deptHeadRate ? 28 : n(deptHeadRate);
-  const effCloseOT = isSDR && !closeOT ? 8 : n(closeOT);
-  const effReconHrs = isSDR && !reconHrs ? 12 : n(reconHrs);
+  const effApRate       = disabledFields.includes('apRate')       ? 0 : (isSDR && !apRate       ? 25 : n(apRate));
+  const effManualMin    = disabledFields.includes('manualMin')    ? 0 : (isSDR && !manualMin    ? 12 : n(manualMin));
+  const effGmRate       = disabledFields.includes('gmRate')       ? 0 : (isSDR && !gmRate       ? 30 : n(gmRate));
+  const effStoreOpsHrs  = disabledFields.includes('storeOpsHrs') ? 0 : (isSDR && !storeOpsHrs  ? 3  : n(storeOpsHrs));
+  const effDeptHeadRate = disabledFields.includes('deptHeadRate') ? 0 : (isSDR && !deptHeadRate ? 28 : n(deptHeadRate));
+  const effCloseOT      = disabledFields.includes('closeOT')      ? 0 : (isSDR && !closeOT      ? 8  : n(closeOT));
+  const effReconHrs     = disabledFields.includes('reconHrs')     ? 0 : (isSDR && !reconHrs     ? 12 : n(reconHrs));
+  const effInvoiceVol       = disabledFields.includes('invoiceVol')       ? 0  : n(invoiceVol);
+  const effStoreCount       = disabledFields.includes('storeCount')       ? 0  : n(storeCount);
+  const effVendorSpend      = disabledFields.includes('vendorSpend')      ? 0  : n(vendorSpend);
+  const effDsdSpend         = disabledFields.includes('dsdSpend')         ? 0  : n(dsdSpend);
+  const effGrowthStores     = disabledFields.includes('growthStores')     ? 0  : n(growthStores);
+  const effDeptHeadCount    = disabledFields.includes('deptHeadCount')    ? 0  : n(deptHeadCount);
+  const effDeptHeadCostHrs  = disabledFields.includes('deptHeadCostHrs') ? 0  : n(deptHeadCostHrs);
+  const effDeptHeadAdminHrs = disabledFields.includes('deptHeadAdminHrs')? 0  : n(deptHeadAdminHrs);
+  const effLineItems        = disabledFields.includes('lineItems')        ? '' : lineItems;
+  const effPricingMaint     = disabledFields.includes('pricingMaint')     ? '' : pricingMaint;
+  const effCodingPractice   = disabledFields.includes('codingPractice')   ? 'summary' : codingPractice;
 
   // ═══ Qualification Score ═══
   const qualScore = useMemo(() => {
@@ -316,37 +354,37 @@ export default function GroceryDiscoveryWorkshop() {
     : 'Several factors will extend the timeline. We should scope services, extended onboarding, and a realistic 4-6 month ramp before we talk go-live.';
 
   // ═══ Auto Solution Path ═══
-  const hasDSD = lineItems === 'high' || lineItems === 'vhigh' || (n(dsdSpend) > 0);
-  const hasIV  = lineItems !== 'low' || pricingMaint === 'active' || pricingMaint === 'moderate';
+  const hasDSD = effLineItems === 'high' || effLineItems === 'vhigh' || (effDsdSpend > 0);
+  const hasIV  = effLineItems !== 'low' || effPricingMaint === 'active' || effPricingMaint === 'moderate';
   const autoPath = hasDSD && hasIV ? 4 : hasDSD ? 3 : hasIV ? 2 : 1;
   const pathNames = { 1: 'Core AP', 2: 'Core AP + Item Validation', 3: 'Core AP + DSD Receiver Match', 4: 'Core AP + DSD Receiver + Item Validation' };
 
   // ═══ ROI Calculations ═══
-  const actualAnnualVol = n(invoiceVol) * 12;
+  const actualAnnualVol = effInvoiceVol * 12;
 
-  const f1IV  = (autoPath === 2 || autoPath === 4) ? n(vendorSpend) * 0.005 : 0;
-  const f1DSD = (autoPath === 3 || autoPath === 4) ? n(dsdSpend) * 0.04 * 0.85 : 0;
-  const f1IVAdj = autoPath === 4 ? Math.max(0, n(vendorSpend) - n(dsdSpend)) * 0.005 : f1IV;
+  const f1IV  = (autoPath === 2 || autoPath === 4) ? effVendorSpend * 0.005 : 0;
+  const f1DSD = (autoPath === 3 || autoPath === 4) ? effDsdSpend * 0.04 * 0.85 : 0;
+  const f1IVAdj = autoPath === 4 ? Math.max(0, effVendorSpend - effDsdSpend) * 0.005 : f1IV;
   const f1 = autoPath >= 2 ? (autoPath === 4 ? f1DSD + f1IVAdj : autoPath === 3 ? f1DSD : f1IV) : 0;
 
   const autoRate = 0.65;
   const curCost       = actualAnnualVol * effManualMin * (effApRate / 60);
   const autoCost      = actualAnnualVol * autoRate * 2 * (effApRate / 60);
   const excCost       = actualAnnualVol * (1 - autoRate) * 8 * (effApRate / 60);
-  const transitionY1  = codingPractice !== 'line-item' && autoPath >= 2 ? (40 * effApRate) + (1.5 * effApRate * 52) : 0;
-  const transitionY2  = codingPractice !== 'line-item' && autoPath >= 2 ? (1.5 * effApRate * 52) : 0;
+  const transitionY1  = effCodingPractice !== 'line-item' && autoPath >= 2 ? (40 * effApRate) + (1.5 * effApRate * 52) : 0;
+  const transitionY2  = effCodingPractice !== 'line-item' && autoPath >= 2 ? (1.5 * effApRate * 52) : 0;
   const f2y1 = (curCost - autoCost) - excCost - transitionY1;
   const f2y2 = (curCost - autoCost) - excCost - transitionY2;
   const f2 = f2y1;
 
-  const f3gmReceiver = n(storeCount) * effStoreOpsHrs * 52 * effGmRate;
-  const f3deptHead = n(deptHeadCount) * (n(deptHeadCostHrs) + n(deptHeadAdminHrs)) * 52 * effDeptHeadRate;
+  const f3gmReceiver = effStoreCount * effStoreOpsHrs * 52 * effGmRate;
+  const f3deptHead = effDeptHeadCount * (effDeptHeadCostHrs + effDeptHeadAdminHrs) * 52 * effDeptHeadRate;
   const f3 = (f3gmReceiver + f3deptHead) * 0.5;
-  const f4 = (autoPath === 2 || autoPath === 4) ? n(vendorSpend) * 0.007 * 0.5 : 0;
+  const f4 = (autoPath === 2 || autoPath === 4) ? effVendorSpend * 0.007 * 0.5 : 0;
   const f5 = (effCloseOT * 0.7 * 12 * (effApRate * 1.5)) + (effReconHrs * 0.65 * 12 * effApRate);
-  const f6 = n(growthStores) * 0.25 * 52000;
+  const f6 = effGrowthStores * 0.25 * 52000;
 
-  const tmdv       = f1 + f2 + f3 + f4 + f5 + f6;
+  const tmdv = f1 + f2 + f3 + f4 + f5 + f6;
   const netAnnual  = tmdv - n(ottimateAnnual);
   const payback    = tmdv > 0 ? (n(ottimateAnnual) / (tmdv / 12)).toFixed(1) : 'N/A';
   const multiplier = n(netMargin) > 0 ? netAnnual / n(netMargin) : 0;
@@ -359,12 +397,12 @@ export default function GroceryDiscoveryWorkshop() {
     : { label: 'Complex',   range: '90-180 days',  color: 'red' };
 
   const impactCategories = [
-    { label: 'Pricing Variance Recovery',  value: f1, active: autoPath >= 2 },
-    { label: 'Invoice Processing Labor',   value: f2, active: true },
-    { label: 'Store Operations Recovery',  value: f3, active: true },
-    { label: 'Vendor Credit Recovery',     value: f4, active: autoPath === 2 || autoPath === 4 },
-    { label: 'Month-End Close Efficiency', value: f5, active: true },
-    { label: 'Growth Scalability',         value: f6, active: n(growthStores) > 0 },
+    { label: 'Pricing Variance Recovery',  key: 'f1', value: f1, active: autoPath >= 2 },
+    { label: 'Invoice Processing Labor',   key: 'f2', value: f2, active: true },
+    { label: 'Store Operations Recovery',  key: 'f3', value: f3, active: true },
+    { label: 'Vendor Credit Recovery',     key: 'f4', value: f4, active: autoPath === 2 || autoPath === 4 },
+    { label: 'Month-End Close Efficiency', key: 'f5', value: f5, active: true },
+    { label: 'Growth Scalability',         key: 'f6', value: f6, active: n(growthStores) > 0 },
   ];
 
   const canNext = phase < activePhases.length - 1;
@@ -700,7 +738,9 @@ export default function GroceryDiscoveryWorkshop() {
             <label className="text-sm font-medium text-slate-700 mb-2 block">Who are we building this for?</label>
             <input value={prospectName} onChange={e => setProspectName(e.target.value)} placeholder="Company name..."
               className="w-full px-4 py-3 border border-slate-300 rounded-lg text-base text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:border-blue-400 mb-4" />
-            <NumField label="Number of store locations" value={storeCount} onChange={setStoreCount} min={1} max={200} note="This shapes every calculation that follows." />
+            <ToggleWrap fieldKey="storeCount" disabledFields={disabledFields} onToggle={toggleField}>
+              <NumField label="Number of store locations" value={storeCount} onChange={setStoreCount} min={1} max={200} note="This shapes every calculation that follows." />
+            </ToggleWrap>
           </div>
         </div>
       );
@@ -710,72 +750,86 @@ export default function GroceryDiscoveryWorkshop() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Invoice Volume & Complexity</h3>
             <p className="text-xs text-slate-400 mb-4">Understanding what hits your AP desk every month.</p>
-            <FramingText text={FRAMING.invoiceVol} />
-            <SliderField
-              label="What's your average monthly invoice volume across all locations?"
-              value={invoiceVol}
-              onChange={setInvoiceVol}
-              min={500}
-              max={100000}
-              step={500}
-              markers={['500', '25K', '50K', '75K', '100K']}
-              note="Include everything: broadline, DSD, specialty, one-offs."
-              formatValue={v => v >= 1000 ? `${Math.round(v / 1000)}K` : v.toLocaleString()}
-            />
-            <SelectField label="Do any vendors split deliveries into multiple invoices?"
-              value={invoiceSplitting} onChange={setInvoiceSplitting}
-              options={[
-                {value:'no',    label:'No — one invoice per delivery'},
-                {value:'some',  label:'Some vendors split by department or location'},
-                {value:'heavy', label:'Yes — many vendors send 3-4+ invoices per delivery'}
-              ]}
-              note="Invoice splitting can inflate your actual volume 20-30% above what you'd expect." />
+            <ToggleWrap fieldKey="invoiceVol" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.invoiceVol} />
+              <SliderField
+                label="What's your average monthly invoice volume across all locations?"
+                value={invoiceVol}
+                onChange={setInvoiceVol}
+                min={500}
+                max={100000}
+                step={500}
+                markers={['500', '25K', '50K', '75K', '100K']}
+                note="Include everything: broadline, DSD, specialty, one-offs."
+                formatValue={v => v >= 1000 ? `${Math.round(v / 1000)}K` : v.toLocaleString()}
+              />
+            </ToggleWrap>
+            <ToggleWrap fieldKey="invoiceSplitting" disabledFields={disabledFields} onToggle={toggleField}>
+              <SelectField label="Do any vendors split deliveries into multiple invoices?"
+                value={invoiceSplitting} onChange={setInvoiceSplitting}
+                options={[
+                  {value:'no',    label:'No — one invoice per delivery'},
+                  {value:'some',  label:'Some vendors split by department or location'},
+                  {value:'heavy', label:'Yes — many vendors send 3-4+ invoices per delivery'}
+                ]}
+                note="Invoice splitting can inflate your actual volume 20-30% above what you'd expect." />
+            </ToggleWrap>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Invoice Format & Line Items</h3>
-            <FramingText text={FRAMING.digitalPct} />
-            <SelectField label="What percentage of your invoices arrive as digital PDFs vs. scanned paper?" value={digitalPct} onChange={setDigitalPct}
-              options={[
-                {value:'high', label:'70%+ are digital PDFs (email or portal)'},
-                {value:'med',  label:'40-70% digital, rest are scanned or paper'},
-                {value:'low',  label:'Under 40% digital — mostly paper, scans, or faxes'}
-              ]} />
-            {showSignals && digitalPct && <div className="mt-1 mb-3"><Signal level={digitalPct === 'high' ? 'green' : digitalPct === 'med' ? 'yellow' : 'red'} /></div>}
+            <ToggleWrap fieldKey="digitalPct" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.digitalPct} />
+              <SelectField label="What percentage of your invoices arrive as digital PDFs vs. scanned paper?" value={digitalPct} onChange={setDigitalPct}
+                options={[
+                  {value:'high', label:'70%+ are digital PDFs (email or portal)'},
+                  {value:'med',  label:'40-70% digital, rest are scanned or paper'},
+                  {value:'low',  label:'Under 40% digital — mostly paper, scans, or faxes'}
+                ]} />
+              {showSignals && digitalPct && <div className="mt-1 mb-3"><Signal level={digitalPct === 'high' ? 'green' : digitalPct === 'med' ? 'yellow' : 'red'} /></div>}
+            </ToggleWrap>
 
-            <FramingText text={FRAMING.lineItems} />
-            <SelectField label="How many line items does your typical invoice have?" value={lineItems} onChange={setLineItems}
-              options={[
-                {value:'low',   label:'Under 20 items — mostly simple invoices'},
-                {value:'med',   label:'20-50 items'},
-                {value:'high',  label:'50-100 items'},
-                {value:'vhigh', label:'100+ items — multi-page detailed invoices'}
-              ]} />
+            <ToggleWrap fieldKey="lineItems" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.lineItems} />
+              <SelectField label="How many line items does your typical invoice have?" value={lineItems} onChange={setLineItems}
+                options={[
+                  {value:'low',   label:'Under 20 items — mostly simple invoices'},
+                  {value:'med',   label:'20-50 items'},
+                  {value:'high',  label:'50-100 items'},
+                  {value:'vhigh', label:'100+ items — multi-page detailed invoices'}
+                ]} />
+            </ToggleWrap>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Invoice Flow & Vendor Landscape</h3>
-            <FramingText text={FRAMING.invoiceTimeline} />
-            <SelectField label="How many days from delivery to invoice entry in your accounting system?" value={invoiceTimeline} onChange={setInvoiceTimeline}
-              options={[
-                {value:'same',  label:'Same day or next day'},
-                {value:'short', label:'2-3 days'},
-                {value:'long',  label:'7-10+ business days'}
-              ]} />
-            {showSignals && timelineSignal && <div className="mt-1 mb-3"><Signal level={timelineSignal} /></div>}
+            <ToggleWrap fieldKey="invoiceTimeline" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.invoiceTimeline} />
+              <SelectField label="How many days from delivery to invoice entry in your accounting system?" value={invoiceTimeline} onChange={setInvoiceTimeline}
+                options={[
+                  {value:'same',  label:'Same day or next day'},
+                  {value:'short', label:'2-3 days'},
+                  {value:'long',  label:'7-10+ business days'}
+                ]} />
+              {showSignals && timelineSignal && <div className="mt-1 mb-3"><Signal level={timelineSignal} /></div>}
+            </ToggleWrap>
 
-            <FramingText text={FRAMING.vendorCount} />
-            <NumField label="How many regular vendors do you work with?" value={vendorCount} onChange={setVendorCount} min={0} max={500}
-              note="Include broadline, DSD, specialty, and local vendors." />
+            <ToggleWrap fieldKey="vendorCount" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.vendorCount} />
+              <NumField label="How many regular vendors do you work with?" value={vendorCount} onChange={setVendorCount} min={0} max={500}
+                note="Include broadline, DSD, specialty, and local vendors." />
+            </ToggleWrap>
 
-            <FramingText text={FRAMING.vendorTurnover} />
-            <SelectField label="How often do you add new vendors?" value={vendorTurnover} onChange={setVendorTurnover}
-              options={[
-                {value:'stable',   label:'Rarely — maybe 2-3 new vendors per quarter'},
-                {value:'moderate', label:'Regularly — 5-10 new vendors per quarter (produce, specialty rotation)'},
-                {value:'high',     label:'Constantly — new vendors every week, especially produce and specialty'}
-              ]}
-              note="High vendor turnover means ongoing system maintenance as new formats and items need to be mapped." />
+            <ToggleWrap fieldKey="vendorTurnover" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.vendorTurnover} />
+              <SelectField label="How often do you add new vendors?" value={vendorTurnover} onChange={setVendorTurnover}
+                options={[
+                  {value:'stable',   label:'Rarely — maybe 2-3 new vendors per quarter'},
+                  {value:'moderate', label:'Regularly — 5-10 new vendors per quarter (produce, specialty rotation)'},
+                  {value:'high',     label:'Constantly — new vendors every week, especially produce and specialty'}
+                ]}
+                note="High vendor turnover means ongoing system maintenance as new formats and items need to be mapped." />
+            </ToggleWrap>
           </div>
         </div>
       );
@@ -785,44 +839,52 @@ export default function GroceryDiscoveryWorkshop() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Vendor & Item Data Quality</h3>
             <p className="text-xs text-slate-400 mb-4">Your data quality is the strongest predictor of onboarding success.</p>
-            <FramingText text={FRAMING.vendorClean} />
-            <SelectField label="How clean is your vendor master?" value={vendorClean} onChange={setVendorClean}
-              options={[
-                {value:'clean', label:'Clean — minimal duplicates, current info, actively maintained'},
-                {value:'some',  label:"Some duplicates — we know about them but haven't cleaned up"},
-                {value:'messy', label:'Messy or unknown — different people have added vendors over the years'}
-              ]} />
-            {showSignals && vendorClean && <div className="mt-1 mb-3"><Signal level={vendorClean === 'clean' ? 'green' : vendorClean === 'some' ? 'yellow' : 'red'} /></div>}
+            <ToggleWrap fieldKey="vendorClean" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.vendorClean} />
+              <SelectField label="How clean is your vendor master?" value={vendorClean} onChange={setVendorClean}
+                options={[
+                  {value:'clean', label:'Clean — minimal duplicates, current info, actively maintained'},
+                  {value:'some',  label:"Some duplicates — we know about them but haven't cleaned up"},
+                  {value:'messy', label:'Messy or unknown — different people have added vendors over the years'}
+                ]} />
+              {showSignals && vendorClean && <div className="mt-1 mb-3"><Signal level={vendorClean === 'clean' ? 'green' : vendorClean === 'some' ? 'yellow' : 'red'} /></div>}
+            </ToggleWrap>
 
-            <FramingText text={FRAMING.itemCatalog} />
-            <SelectField label="Do your items have UPCs in your POS, with consistent descriptions?" value={itemCatalog} onChange={setItemCatalog}
-              options={[
-                {value:'clean',   label:'Yes — UPCs present, descriptions consistent, catalog maintained'},
-                {value:'partial', label:'Partial — branded items have UPCs, deli/bakery are by description'},
-                {value:'messy',   label:'No — no UPCs, inconsistent descriptions, catalog needs work'}
-              ]} />
-            {showSignals && itemCatalog && <div className="mt-1 mb-3"><Signal level={itemCatalog === 'clean' ? 'green' : itemCatalog === 'partial' ? 'yellow' : 'red'} /></div>}
+            <ToggleWrap fieldKey="itemCatalog" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.itemCatalog} />
+              <SelectField label="Do your items have UPCs in your POS, with consistent descriptions?" value={itemCatalog} onChange={setItemCatalog}
+                options={[
+                  {value:'clean',   label:'Yes — UPCs present, descriptions consistent, catalog maintained'},
+                  {value:'partial', label:'Partial — branded items have UPCs, deli/bakery are by description'},
+                  {value:'messy',   label:'No — no UPCs, inconsistent descriptions, catalog needs work'}
+                ]} />
+              {showSignals && itemCatalog && <div className="mt-1 mb-3"><Signal level={itemCatalog === 'clean' ? 'green' : itemCatalog === 'partial' ? 'yellow' : 'red'} /></div>}
+            </ToggleWrap>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Accounting Structure & Pricing</h3>
-            <FramingText text={FRAMING.chartOfAccounts} />
-            <SelectField label="How is your chart of accounts structured across locations?" value={coaStructure} onChange={setCoaStructure}
-              options={[
-                {value:'consolidated', label:'Same chart of accounts across all locations'},
-                {value:'minor',        label:'Mostly the same with a few location-specific variations'},
-                {value:'siloed',       label:'Each store has its own set of books and GL codes'}
-              ]} />
-            {showSignals && coaStructure && <div className="mt-1 mb-3"><Signal level={coaStructure === 'consolidated' ? 'green' : coaStructure === 'minor' ? 'yellow' : 'red'} /></div>}
+            <ToggleWrap fieldKey="coaStructure" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.chartOfAccounts} />
+              <SelectField label="How is your chart of accounts structured across locations?" value={coaStructure} onChange={setCoaStructure}
+                options={[
+                  {value:'consolidated', label:'Same chart of accounts across all locations'},
+                  {value:'minor',        label:'Mostly the same with a few location-specific variations'},
+                  {value:'siloed',       label:'Each store has its own set of books and GL codes'}
+                ]} />
+              {showSignals && coaStructure && <div className="mt-1 mb-3"><Signal level={coaStructure === 'consolidated' ? 'green' : coaStructure === 'minor' ? 'yellow' : 'red'} /></div>}
+            </ToggleWrap>
 
-            <FramingText text={FRAMING.pricingData} />
-            <SelectField label="How often does your POS pricing data get updated?" value={pricingMaint} onChange={setPricingMaint}
-              options={[
-                {value:'active',   label:'Weekly — distributor sends cost files and we upload them'},
-                {value:'moderate', label:'When we get vendor notices, but usually a few weeks behind'},
-                {value:'rarely',   label:'Only when someone notices a big discrepancy'}
-              ]} />
-            {showSignals && pricingMaint && <div className="mt-1 mb-3"><Signal level={pricingMaint === 'active' ? 'green' : pricingMaint === 'moderate' ? 'yellow' : 'red'} /></div>}
+            <ToggleWrap fieldKey="pricingMaint" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.pricingData} />
+              <SelectField label="How often does your POS pricing data get updated?" value={pricingMaint} onChange={setPricingMaint}
+                options={[
+                  {value:'active',   label:'Weekly — distributor sends cost files and we upload them'},
+                  {value:'moderate', label:'When we get vendor notices, but usually a few weeks behind'},
+                  {value:'rarely',   label:'Only when someone notices a big discrepancy'}
+                ]} />
+              {showSignals && pricingMaint && <div className="mt-1 mb-3"><Signal level={pricingMaint === 'active' ? 'green' : pricingMaint === 'moderate' ? 'yellow' : 'red'} /></div>}
+            </ToggleWrap>
           </div>
         </div>
       );
@@ -831,49 +893,57 @@ export default function GroceryDiscoveryWorkshop() {
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Your Accounting & Technology</h3>
-            <FramingText text={FRAMING.erp} />
-            <SelectField label="What ERP or accounting system are you using?" value={erp} onChange={setErp}
-              options={[
-                {value:'qbo',     label:'QuickBooks Online'},
-                {value:'qbd',     label:'QuickBooks Desktop'},
-                {value:'sage',    label:'Sage (100/300 or Intacct)'},
-                {value:'fms',     label:'FMS (Financial Management Solutions)'},
-                {value:'complex', label:'Acumatica, NetSuite, Oracle, or custom system'}
-              ]} />
-            {showSignals && erp && <div className="mt-1 mb-3"><Signal level={erp === 'qbo' ? 'green' : erp === 'qbd' || erp === 'sage' || erp === 'fms' ? 'yellow' : 'red'} /></div>}
+            <ToggleWrap fieldKey="erp" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.erp} />
+              <SelectField label="What ERP or accounting system are you using?" value={erp} onChange={setErp}
+                options={[
+                  {value:'qbo',     label:'QuickBooks Online'},
+                  {value:'qbd',     label:'QuickBooks Desktop'},
+                  {value:'sage',    label:'Sage (100/300 or Intacct)'},
+                  {value:'fms',     label:'FMS (Financial Management Solutions)'},
+                  {value:'complex', label:'Acumatica, NetSuite, Oracle, or custom system'}
+                ]} />
+              {showSignals && erp && <div className="mt-1 mb-3"><Signal level={erp === 'qbo' ? 'green' : erp === 'qbd' || erp === 'sage' || erp === 'fms' ? 'yellow' : 'red'} /></div>}
+            </ToggleWrap>
 
-            <SelectField label="Who manages your accounting system?" value={erpManaged} onChange={setErpManaged}
-              options={[
-                {value:'internal',   label:'We manage it ourselves internally'},
-                {value:'bookkeeper', label:'Our bookkeeper handles everything'},
-                {value:'consultant', label:'An outside IT firm or consultant manages it'}
-              ]} />
-            {erpManaged === 'consultant' && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 mb-4">
-                Third-party ERP management adds coordination complexity. We'll want to include them in integration planning early.
-              </div>
-            )}
+            <ToggleWrap fieldKey="erpManaged" disabledFields={disabledFields} onToggle={toggleField}>
+              <SelectField label="Who manages your accounting system?" value={erpManaged} onChange={setErpManaged}
+                options={[
+                  {value:'internal',   label:'We manage it ourselves internally'},
+                  {value:'bookkeeper', label:'Our bookkeeper handles everything'},
+                  {value:'consultant', label:'An outside IT firm or consultant manages it'}
+                ]} />
+              {erpManaged === 'consultant' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 mb-4">
+                  Third-party ERP management adds coordination complexity. We'll want to include them in integration planning early.
+                </div>
+              )}
+            </ToggleWrap>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Scanning & Technical Readiness</h3>
-            <FramingText text={FRAMING.scanning} />
-            <SelectField label="How do you currently capture invoices that arrive as paper?" value={scanning} onChange={setScanning}
-              options={[
-                {value:'commercial', label:'Commercial scanner at each location — clear, high-res scans'},
-                {value:'basic',      label:'Basic scanner — most scans are okay, some are fuzzy'},
-                {value:'phone',      label:'Phone photos or no scanning — everything is paper'},
-                {value:'na',         label:'N/A — most invoices are already digital'}
-              ]} />
+            <ToggleWrap fieldKey="scanning" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.scanning} />
+              <SelectField label="How do you currently capture invoices that arrive as paper?" value={scanning} onChange={setScanning}
+                options={[
+                  {value:'commercial', label:'Commercial scanner at each location — clear, high-res scans'},
+                  {value:'basic',      label:'Basic scanner — most scans are okay, some are fuzzy'},
+                  {value:'phone',      label:'Phone photos or no scanning — everything is paper'},
+                  {value:'na',         label:'N/A — most invoices are already digital'}
+                ]} />
+            </ToggleWrap>
 
-            <FramingText text={FRAMING.techSkills} />
-            <SelectField label="Does your team have someone comfortable with basic software administration?" value={techSkills} onChange={setTechSkills}
-              options={[
-                {value:'strong',  label:'Yes — tech-savvy office manager or IT person on staff'},
-                {value:'willing', label:'We can figure things out but need thorough training'},
-                {value:'limited', label:'Our team struggles with technology — most AP work is on paper'}
-              ]} />
-            {showSignals && techSkills && <div className="mt-1 mb-3"><Signal level={techSkills === 'strong' ? 'green' : techSkills === 'willing' ? 'yellow' : 'red'} /></div>}
+            <ToggleWrap fieldKey="techSkills" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.techSkills} />
+              <SelectField label="Does your team have someone comfortable with basic software administration?" value={techSkills} onChange={setTechSkills}
+                options={[
+                  {value:'strong',  label:'Yes — tech-savvy office manager or IT person on staff'},
+                  {value:'willing', label:'We can figure things out but need thorough training'},
+                  {value:'limited', label:'Our team struggles with technology — most AP work is on paper'}
+                ]} />
+              {showSignals && techSkills && <div className="mt-1 mb-3"><Signal level={techSkills === 'strong' ? 'green' : techSkills === 'willing' ? 'yellow' : 'red'} /></div>}
+            </ToggleWrap>
           </div>
         </div>
       );
@@ -883,54 +953,64 @@ export default function GroceryDiscoveryWorkshop() {
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Your Team Structure</h3>
             <p className="text-xs text-slate-400 mb-4">Who's involved in your invoice and purchasing workflow.</p>
-            <NumField label="How many people are on your AP team?" value={apHeadcount} onChange={setApHeadcount} min={1} max={20}
-              note="Everyone who touches invoice processing — data entry, coding, approvals." />
-            <FramingText text={FRAMING.deptHeads} />
-            <NumField label="How many department or category managers do you have?" value={deptHeadCount} onChange={setDeptHeadCount} min={0} max={30}
-              note="Meat, produce, deli, bakery, grocery — anyone who reviews costs for their area." />
+            <ToggleWrap fieldKey="apHeadcount" disabledFields={disabledFields} onToggle={toggleField}>
+              <NumField label="How many people are on your AP team?" value={apHeadcount} onChange={setApHeadcount} min={1} max={20}
+                note="Everyone who touches invoice processing — data entry, coding, approvals." />
+            </ToggleWrap>
+            <ToggleWrap fieldKey="deptHeadCount" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.deptHeads} />
+              <NumField label="How many department or category managers do you have?" value={deptHeadCount} onChange={setDeptHeadCount} min={0} max={30}
+                note="Meat, produce, deli, bakery, grocery — anyone who reviews costs for their area." />
+            </ToggleWrap>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Implementation Ownership</h3>
             <p className="text-xs text-slate-400 mb-4">The people and bandwidth behind the project.</p>
-            <FramingText text={FRAMING.implOwner} />
-            <SelectField label="Who on your team will own the implementation, and how much time can they give it?" value={implOwner} onChange={setImplOwner}
-              options={[
-                {value:'named', label:'Named person with 5-10 hours/week dedicated'},
-                {value:'busy',  label:"Someone assigned but they're stretched thin"},
-                {value:'none',  label:"We'll figure that out later / nobody identified yet"}
-              ]} />
-            {showSignals && implOwner && <div className="mt-1 mb-3"><Signal level={implOwner === 'named' ? 'green' : implOwner === 'busy' ? 'yellow' : 'red'} /></div>}
-            {implOwner === 'none' && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 mt-2">
-                Every customer where we deliver value quickly has a named owner with real time committed. Let's make sure we identify that person before we finalize the plan.
-              </div>
-            )}
+            <ToggleWrap fieldKey="implOwner" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.implOwner} />
+              <SelectField label="Who on your team will own the implementation, and how much time can they give it?" value={implOwner} onChange={setImplOwner}
+                options={[
+                  {value:'named', label:'Named person with 5-10 hours/week dedicated'},
+                  {value:'busy',  label:"Someone assigned but they're stretched thin"},
+                  {value:'none',  label:"We'll figure that out later / nobody identified yet"}
+                ]} />
+              {showSignals && implOwner && <div className="mt-1 mb-3"><Signal level={implOwner === 'named' ? 'green' : implOwner === 'busy' ? 'yellow' : 'red'} /></div>}
+              {implOwner === 'none' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 mt-2">
+                  Every customer where we deliver value quickly has a named owner with real time committed. Let's make sure we identify that person before we finalize the plan.
+                </div>
+              )}
+            </ToggleWrap>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Timeline & Success Definition</h3>
-            <FramingText text={FRAMING.timeline} />
-            <SelectField label="What does your timeline look like?" value={timeline} onChange={setTimeline}
-              options={[
-                {value:'ready',     label:'Want to be live next quarter — team has capacity now'},
-                {value:'competing', label:'Year-end goal, but we have competing priorities'},
-                {value:'urgent',    label:'Need it immediately (but resources are limited)'},
-                {value:'noRush',    label:'No rush — whenever it makes sense'}
-              ]} />
+            <ToggleWrap fieldKey="timeline" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.timeline} />
+              <SelectField label="What does your timeline look like?" value={timeline} onChange={setTimeline}
+                options={[
+                  {value:'ready',     label:'Want to be live next quarter — team has capacity now'},
+                  {value:'competing', label:'Year-end goal, but we have competing priorities'},
+                  {value:'urgent',    label:'Need it immediately (but resources are limited)'},
+                  {value:'noRush',    label:'No rush — whenever it makes sense'}
+                ]} />
+            </ToggleWrap>
 
-            <FramingText text={FRAMING.successMetrics} />
-            <SelectField label="How will you measure whether this is successful?" value={successMetrics} onChange={setSuccessMetrics}
-              options={[
-                {value:'specific',  label:'Specific targets — reduce processing time by X%, catch discrepancies automatically'},
-                {value:'directional', label:'Just make it easier than what we\'re doing now'},
-                {value:'vague',     label:'I just want it to work / the AI should handle everything'}
-              ]} />
-            {successMetrics === 'vague' && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 mt-2">
-                Let's put some numbers on that together. If we can agree on what "working" looks like now, we'll both know when the system is delivering.
-              </div>
-            )}
+            <ToggleWrap fieldKey="successMetrics" disabledFields={disabledFields} onToggle={toggleField}>
+              <FramingText text={FRAMING.successMetrics} />
+              <SelectField label="How will you measure whether this is successful?" value={successMetrics} onChange={setSuccessMetrics}
+                options={[
+                  {value:'specific',  label:'Specific targets — reduce processing time by X%, catch discrepancies automatically'},
+                  {value:'directional', label:'Just make it easier than what we\'re doing now'},
+                  {value:'vague',     label:'I just want it to work / the AI should handle everything'}
+                ]} />
+              {successMetrics === 'vague' && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 mt-2">
+                  Let's put some numbers on that together. If we can agree on what "working" looks like now, we'll both know when the system is delivering.
+                </div>
+              )}
+            </ToggleWrap>
           </div>
         </div>
       );
@@ -941,38 +1021,58 @@ export default function GroceryDiscoveryWorkshop() {
             <h3 className="text-lg font-bold text-slate-800 mb-1">AP Processing Costs</h3>
             <p className="text-xs text-slate-400 mb-4">What it costs your AP team to process invoices today.</p>
             <div className="grid grid-cols-2 gap-4">
-              <NumField label="Fully-loaded AP hourly rate" value={apRate} onChange={setApRate} min={15} max={55} prefix="$" suffix="/hr"
-                note="Base + benefits + taxes + overhead" />
-              <NumField label="Minutes per invoice (manual)" value={manualMin} onChange={setManualMin} min={2} max={30} suffix="min"
-                note="Average, not best case" />
+              <ToggleWrap fieldKey="apRate" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="Fully-loaded AP hourly rate" value={apRate} onChange={setApRate} min={15} max={55} prefix="$" suffix="/hr"
+                  note="Base + benefits + taxes + overhead" />
+              </ToggleWrap>
+              <ToggleWrap fieldKey="manualMin" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="Minutes per invoice (manual)" value={manualMin} onChange={setManualMin} min={2} max={30} suffix="min"
+                  note="Average, not best case" />
+              </ToggleWrap>
             </div>
-            <SelectField label="Current coding practice" value={codingPractice} onChange={setCodingPractice}
-              options={[
-                {value:'line-item', label:'Already coding at line-item level'},
-                {value:'summary',   label:'Summary splits (% by department)'},
-                {value:'mixed',     label:'Mixed — depends on the vendor'}
-              ]} />
+            <ToggleWrap fieldKey="codingPractice" disabledFields={disabledFields} onToggle={toggleField}>
+              <SelectField label="Current coding practice" value={codingPractice} onChange={setCodingPractice}
+                options={[
+                  {value:'line-item', label:'Already coding at line-item level'},
+                  {value:'summary',   label:'Summary splits (% by department)'},
+                  {value:'mixed',     label:'Mixed — depends on the vendor'}
+                ]} />
+            </ToggleWrap>
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-1">Store & Department Costs</h3>
             <p className="text-xs text-slate-400 mb-4">Time and cost for GMs, receivers, and department heads on invoice-related work.</p>
             <div className="grid grid-cols-2 gap-4">
-              <NumField label="GM/receiver hours/week on invoice paperwork" value={storeOpsHrs} onChange={setStoreOpsHrs} min={0} max={15} suffix="hrs/store"
-                note="Collecting slips, organizing receipts, reconciling deliveries" />
-              <NumField label="GM/store manager hourly rate" value={gmRate} onChange={setGmRate} min={20} max={60} prefix="$" suffix="/hr" />
-              <NumField label="Dept head hours/week verifying costs" value={deptHeadCostHrs} onChange={setDeptHeadCostHrs} min={0} max={20} suffix="hrs/week"
-                note="Checking invoices match what was delivered and priced correctly" />
-              <NumField label="Dept head hours/week on invoice admin" value={deptHeadAdminHrs} onChange={setDeptHeadAdminHrs} min={0} max={20} suffix="hrs/week"
-                note="Organizing paperwork, matching credits, reconciling statements" />
-              <NumField label="Department head hourly rate" value={deptHeadRate} onChange={setDeptHeadRate} min={15} max={60} prefix="$" suffix="/hr"
-                note="Base + benefits + taxes + overhead" />
+              <ToggleWrap fieldKey="storeOpsHrs" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="GM/receiver hours/week on invoice paperwork" value={storeOpsHrs} onChange={setStoreOpsHrs} min={0} max={15} suffix="hrs/store"
+                  note="Collecting slips, organizing receipts, reconciling deliveries" />
+              </ToggleWrap>
+              <ToggleWrap fieldKey="gmRate" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="GM/store manager hourly rate" value={gmRate} onChange={setGmRate} min={20} max={60} prefix="$" suffix="/hr" />
+              </ToggleWrap>
+              <ToggleWrap fieldKey="deptHeadCostHrs" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="Dept head hours/week verifying costs" value={deptHeadCostHrs} onChange={setDeptHeadCostHrs} min={0} max={20} suffix="hrs/week"
+                  note="Checking invoices match what was delivered and priced correctly" />
+              </ToggleWrap>
+              <ToggleWrap fieldKey="deptHeadAdminHrs" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="Dept head hours/week on invoice admin" value={deptHeadAdminHrs} onChange={setDeptHeadAdminHrs} min={0} max={20} suffix="hrs/week"
+                  note="Organizing paperwork, matching credits, reconciling statements" />
+              </ToggleWrap>
+              <ToggleWrap fieldKey="deptHeadRate" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="Department head hourly rate" value={deptHeadRate} onChange={setDeptHeadRate} min={15} max={60} prefix="$" suffix="/hr"
+                  note="Base + benefits + taxes + overhead" />
+              </ToggleWrap>
             </div>
             <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-100">
-              <NumField label="Month-end close overtime hours" value={closeOT} onChange={setCloseOT} min={0} max={50} suffix="hrs/close"
-                note="Extra hours per month-end" />
-              <NumField label="Monthly reconciliation hours" value={reconHrs} onChange={setReconHrs} min={0} max={80} suffix="hrs/month"
-                note="Vendor statements, clearing accounts" />
+              <ToggleWrap fieldKey="closeOT" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="Month-end close overtime hours" value={closeOT} onChange={setCloseOT} min={0} max={50} suffix="hrs/close"
+                  note="Extra hours per month-end" />
+              </ToggleWrap>
+              <ToggleWrap fieldKey="reconHrs" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="Monthly reconciliation hours" value={reconHrs} onChange={setReconHrs} min={0} max={80} suffix="hrs/month"
+                  note="Vendor statements, clearing accounts" />
+              </ToggleWrap>
             </div>
           </div>
 
@@ -980,30 +1080,36 @@ export default function GroceryDiscoveryWorkshop() {
             <h3 className="text-lg font-bold text-slate-800 mb-1">Spend, Growth & Investment</h3>
             <p className="text-xs text-slate-400 mb-5">Slide to adjust — these numbers drive the biggest line items in the impact model.</p>
 
-            <SliderField
-              label="Total annual vendor spend"
-              value={vendorSpend}
-              onChange={setVendorSpend}
-              min={500000}
-              max={500000000}
-              step={1000000}
-              markers={['$500K', '$125M', '$250M', '$375M', '$500M']}
-              note="All vendors flowing through AP — broadline, DSD, specialty, local"
-            />
-            <SliderField
-              label="Annual DSD vendor spend"
-              value={dsdSpend}
-              onChange={setDsdSpend}
-              min={0}
-              max={250000000}
-              step={500000}
-              markers={['$0', '$62.5M', '$125M', '$187.5M', '$250M']}
-              note="Pepsi, Coke, local bakeries, produce — direct store delivery vendors only"
-            />
+            <ToggleWrap fieldKey="vendorSpend" disabledFields={disabledFields} onToggle={toggleField}>
+              <SliderField
+                label="Total annual vendor spend"
+                value={vendorSpend}
+                onChange={setVendorSpend}
+                min={500000}
+                max={500000000}
+                step={1000000}
+                markers={['$500K', '$125M', '$250M', '$375M', '$500M']}
+                note="All vendors flowing through AP — broadline, DSD, specialty, local"
+              />
+            </ToggleWrap>
+            <ToggleWrap fieldKey="dsdSpend" disabledFields={disabledFields} onToggle={toggleField}>
+              <SliderField
+                label="Annual DSD vendor spend"
+                value={dsdSpend}
+                onChange={setDsdSpend}
+                min={0}
+                max={250000000}
+                step={500000}
+                markers={['$0', '$62.5M', '$125M', '$187.5M', '$250M']}
+                note="Pepsi, Coke, local bakeries, produce — direct store delivery vendors only"
+              />
+            </ToggleWrap>
 
             <div className="grid grid-cols-2 gap-4 mt-4">
-              <NumField label="New stores planned (next 12-24 months)" value={growthStores} onChange={setGrowthStores} min={0} max={20}
-                note="0 if no expansion plans" />
+              <ToggleWrap fieldKey="growthStores" disabledFields={disabledFields} onToggle={toggleField}>
+                <NumField label="New stores planned (next 12-24 months)" value={growthStores} onChange={setGrowthStores} min={0} max={20}
+                  note="0 if no expansion plans" />
+              </ToggleWrap>
               <NumField label="Ottimate annual investment" value={ottimateAnnual} onChange={setOttimateAnnual} min={0} max={500000} prefix="$"
                 note="Your proposed annual cost" />
             </div>
@@ -1172,7 +1278,7 @@ export default function GroceryDiscoveryWorkshop() {
   const handleSave = async () => {
     setSaveState('saving');
     const fullState = {
-      prospectName, phase, showImpact, showSummary, expandedCalcs,
+      prospectName, phase, showImpact, showSummary, expandedCalcs, disabledFields,
       invoiceVol, invoiceSplitting, digitalPct, lineItems, invoiceTimeline,
       vendorCount, vendorTurnover, storeCount,
       vendorClean, itemCatalog, coaStructure, pricingMaint,
